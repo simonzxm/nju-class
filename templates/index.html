@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,21 +10,27 @@
         body {
             background-color: #f8f9fa;
         }
+
         .container {
             margin-top: 50px;
         }
+
         .card {
             margin-bottom: 20px;
         }
+
         .changelog {
             position: absolute;
             top: 10px;
             right: 10px;
             font-size: 0.8em;
             text-align: right;
-            max-width: 200px; /* 限制最大宽度 */
-            word-wrap: break-word; /* 自动换行 */
+            max-width: 200px;
+            /* 限制最大宽度 */
+            word-wrap: break-word;
+            /* 自动换行 */
         }
+
         @media (max-width: 768px) {
             .changelog {
                 position: static;
@@ -33,19 +40,18 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1 class="text-center">NJU选课助手</h1>
         <div class="text-center mb-4">
-            <span>Created by carottx</span> | 
-            <a href="https://github.com/carottX/nju-class" target="_blank">项目主页</a> | 
-            欢迎通过<a href="mailto:xuzm0616@gmail.com">邮件</a>或者<a href="https://table.nju.edu.cn/external-apps/7aded834-74a2-43cc-b515-fb8e01656ef2/" target="_blank">NJUTable</a>添加更多红黑榜！
+            <span>Created by carottx</span>
         </div>
         <div class="changelog">
             <p>Changelog:</p>
             <p>v1.0 支持不完全匹配</p>
             <p>v1.1 教师支持首字母匹配</p>
-            <p>v1.2 支持从nju table上动态拉取，使用json作为数据源，添加更多数据源</p>
+            <p>v1.2 使用json作为数据源，添加更多数据源</p>
         </div>
         <div class="row">
             <div class="col-md-6">
@@ -68,13 +74,13 @@
     </div>
 
     <script>
-        window.addEventListener('DOMContentLoaded', function() {
-            document.getElementById('teacherName').addEventListener('keydown', function(event) {
+        window.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('teacherName').addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     searchTeacher();
                 }
             });
-            document.getElementById('courseName').addEventListener('keydown', function(event) {
+            document.getElementById('courseName').addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
                     searchCourse();
                 }
@@ -97,9 +103,9 @@
                                 .filter(key => key.startsWith('评价'))
                                 .map(key => item[key])
                                 .filter(review => review);
-                            
+
                             const sources = item.来源 ? (Array.isArray(item.来源) ? item.来源.join(', ') : item.来源) : '未知来源';
-                            
+
                             // 为每一条评价创建单独的卡片
                             if (reviews.length > 0) {
                                 reviews.forEach(review => {
@@ -149,9 +155,9 @@
                                 .filter(key => key.startsWith('评价'))
                                 .map(key => item[key])
                                 .filter(review => review);
-                            
+
                             const sources = item.来源 ? (Array.isArray(item.来源) ? item.来源.join(', ') : item.来源) : '未知来源';
-                            
+
                             // 为每一条评价创建单独的卡片
                             if (reviews.length > 0) {
                                 reviews.forEach(review => {
@@ -185,4 +191,5 @@
         }
     </script>
 </body>
+
 </html>

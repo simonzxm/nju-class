@@ -3,20 +3,15 @@ import pandas as pd
 import glob
 import logging
 import re
-import threading
-import time
 from pypinyin import lazy_pinyin, Style
-from nju_table import fetch_data, merge_json_files
-from config import config
 
 app = Flask(__name__)
 
 # 配置日志记录
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
-# 全局变量和锁
+# 全局变量
 data = None
-data_lock = threading.Lock()
 
 def load_data():
     all_files = glob.glob("data/merged_data.json")
@@ -28,20 +23,6 @@ def load_data():
     combined_df = pd.concat(df_list, ignore_index=True)
     return combined_df
 
-def update_data():
-    global data
-    while True:
-        fetch_data()
-        merge_json_files()
-        with data_lock:
-            data = load_data()
-        time.sleep(3600)  # 每小时运行一次
-
-# 启动定时任务线程
-update_thread = threading.Thread(target=update_data)
-update_thread.daemon = True
-update_thread.start()
-
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -52,38 +33,37 @@ def search_teacher():
     if not teacher_name:
         return jsonify({'error': 'Teacher name is required'}), 400
     
-    with data_lock:
-        # 精准匹配
-        exact_match = data[data['教师'] == teacher_name]
+    # 精准匹配
+    exact_match = data[data['教师'] == teacher_name]
+    
+    # 构建正则表达式模式，允许在字符之间有任意字符
+    pattern = '.*'.join(teacher_name)
+    regex = re.compile(pattern, re.IGNORECASE)
+    
+    # 模糊匹配
+    partial_match = data[data['教师'].str.contains(regex, na=False) & (data['教师'] != teacher_name)]
+    
+    # 拼音首字母匹配
+    def match_pinyin_initials(name, initials):
+        if pd.isna(name):
+            return False
+        pinyin_initials = ''.join([p[0] for p in lazy_pinyin(name, style=Style.FIRST_LETTER)])
+        return pinyin_initials.startswith(initials.lower())
+    
+    pinyin_match = data[data['教师'].apply(lambda x: match_pinyin_initials(x, teacher_name))]
+    
+    # 合并结果，精准匹配的结果在前
+    result = pd.concat([exact_match, partial_match, pinyin_match])
+    
+    # 处理包含列表的列，将其转换为字符串以便去重
+    if '来源' in result.columns:
+        result['来源_str'] = result['来源'].apply(lambda x: str(x) if isinstance(x, list) else x)
+        result = result.drop_duplicates(subset=[col for col in result.columns if col != '来源'])
+        result = result.drop('来源_str', axis=1)
+    else:
+        result = result.drop_duplicates()
         
-        # 构建正则表达式模式，允许在字符之间有任意字符
-        pattern = '.*'.join(teacher_name)
-        regex = re.compile(pattern, re.IGNORECASE)
-        
-        # 模糊匹配
-        partial_match = data[data['教师'].str.contains(regex, na=False) & (data['教师'] != teacher_name)]
-        
-        # 拼音首字母匹配
-        def match_pinyin_initials(name, initials):
-            if pd.isna(name):
-                return False
-            pinyin_initials = ''.join([p[0] for p in lazy_pinyin(name, style=Style.FIRST_LETTER)])
-            return pinyin_initials.startswith(initials.lower())
-        
-        pinyin_match = data[data['教师'].apply(lambda x: match_pinyin_initials(x, teacher_name))]
-        
-        # 合并结果，精准匹配的结果在前
-        result = pd.concat([exact_match, partial_match, pinyin_match])
-        
-        # 处理包含列表的列，将其转换为字符串以便去重
-        if '来源' in result.columns:
-            result['来源_str'] = result['来源'].apply(lambda x: str(x) if isinstance(x, list) else x)
-            result = result.drop_duplicates(subset=[col for col in result.columns if col != '来源'])
-            result = result.drop('来源_str', axis=1)
-        else:
-            result = result.drop_duplicates()
-            
-        result = result.apply(lambda x: x.dropna(), axis=1)
+    result = result.apply(lambda x: x.dropna(), axis=1)
     
     if result.empty:
         return jsonify({'message': 'No courses found for this teacher'}), 404
@@ -96,29 +76,28 @@ def search_course():
     if not course_name:
         return jsonify({'error': 'Course name is required'}), 400
     
-    with data_lock:
-        # 精准匹配
-        exact_match = data[data['课程名称'] == course_name]
+    # 精准匹配
+    exact_match = data[data['课程名称'] == course_name]
+    
+    # 构建正则表达式模式，允许在字符之间有任意字符
+    pattern = '.*'.join(course_name)
+    regex = re.compile(pattern, re.IGNORECASE)
+    
+    # 模糊匹配
+    partial_match = data[data['课程名称'].str.contains(regex, na=False) & (data['课程名称'] != course_name)]
+    
+    # 合并结果，精准匹配的结果在前
+    result = pd.concat([exact_match, partial_match])
+    
+    # 处理包含列表的列，将其转换为字符串以便去重
+    if '来源' in result.columns:
+        result['来源_str'] = result['来源'].apply(lambda x: str(x) if isinstance(x, list) else x)
+        result = result.drop_duplicates(subset=[col for col in result.columns if col != '来源'])
+        result = result.drop('来源_str', axis=1)
+    else:
+        result = result.drop_duplicates()
         
-        # 构建正则表达式模式，允许在字符之间有任意字符
-        pattern = '.*'.join(course_name)
-        regex = re.compile(pattern, re.IGNORECASE)
-        
-        # 模糊匹配
-        partial_match = data[data['课程名称'].str.contains(regex, na=False) & (data['课程名称'] != course_name)]
-        
-        # 合并结果，精准匹配的结果在前
-        result = pd.concat([exact_match, partial_match])
-        
-        # 处理包含列表的列，将其转换为字符串以便去重
-        if '来源' in result.columns:
-            result['来源_str'] = result['来源'].apply(lambda x: str(x) if isinstance(x, list) else x)
-            result = result.drop_duplicates(subset=[col for col in result.columns if col != '来源'])
-            result = result.drop('来源_str', axis=1)
-        else:
-            result = result.drop_duplicates()
-            
-        result = result.apply(lambda x: x.dropna(), axis=1)
+    result = result.apply(lambda x: x.dropna(), axis=1)
     
     if result.empty:
         return jsonify({'message': 'No reviews found for this course'}), 404
@@ -126,6 +105,5 @@ def search_course():
     return result.to_json(orient='records', force_ascii=False)
 
 if __name__ == '__main__':
-    with data_lock:
-        data = load_data()
+    data = load_data()
     app.run(debug=True)
